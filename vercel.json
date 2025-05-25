@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "name": "signsetu",
+  "buildCommand": "cd client && npm install && npm run build",
+  "outputDirectory": "client/build",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://signsetu-api.vercel.app/api/:path*" }
+  ],
+  "github": {
+    "silent": true
+  },
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./"
+}

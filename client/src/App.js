@@ -14,12 +14,18 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Configuration based on environment
 const config = {
+  // Use environment variables with fallbacks for both local and Vercel deployment
   appName: process.env.REACT_APP_PROJECT_NAME || 'SignSetu',
-  apiUrl: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  apiUrl: process.env.REACT_APP_API_URL || (
+    // Automatically detect if running on Vercel production
+    window.location.hostname.includes('vercel.app') 
+      ? 'https://signsetu-api.vercel.app/api'
+      : 'http://localhost:5000/api'
+  ),
   environment: process.env.NODE_ENV
 };
 
-console.log(`Running in ${config.environment} environment`);
+console.log(`Running in ${config.environment} environment with API URL: ${config.apiUrl}`);
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);

@@ -1,28 +1,34 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 
-export const WordContext = createContext();
+// Automatically detect if running on Vercel
+const API_URL = process.env.REACT_APP_API_URL || (
+  window.location.hostname.includes('vercel.app') 
+    ? 'https://signsetu-api.vercel.app/api'
+    : 'http://localhost:5000/api'
+);
 
-const API_URL = 'http://localhost:5000/api';
+export const WordContext = createContext();
 
 export const WordProvider = ({ children }) => {
   const [words, setWords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchWords = async () => {
+  // Use dynamic API URL based on environment
+  const fetchWords = useCallback(async () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_URL}/words`);
       setWords(response.data);
       setError(null);
     } catch (err) {
-      setError('Error fetching words. Please try again later.');
       console.error('Error fetching words:', err);
+      setError('Failed to fetch words. Please try again later.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const searchWords = async (query) => {
     setLoading(true);
@@ -91,7 +97,7 @@ export const WordProvider = ({ children }) => {
 
   useEffect(() => {
     fetchWords();
-  }, []);
+  }, [fetchWords]);
 
   return (
     <WordContext.Provider value={{
