@@ -2,6 +2,12 @@
 
 SignSetu is a comprehensive sign language learning platform aimed at bridging communication gaps by providing an interactive visual dictionary. The project offers a rich library of sign language words with images, videos, and detailed explanations.
 
+## Live Demo
+
+- **Frontend**: [https://sign-setu-frontend.vercel.app/](https://sign-setu-frontend.vercel.app/)
+- **Backend API**: [https://sign-setu-backend.vercel.app/api](https://sign-setu-backend.vercel.app/api)
+- **Demo Video**: [Watch the explanation video](https://youtu.be/your-video-id) 
+
 ## Features
 
 ### Core Features
@@ -123,19 +129,45 @@ MONGODB_URI=your_mongodb_connection_string
 PORT=5000
 ```
 
-5. Start the server:
+5. Create a `.env` file in the client directory:
+```
+REACT_APP_API_URL=https://sign-setu-backend.vercel.app/api
+REACT_APP_PROJECT_NAME=SignSetu
+```
+
+6. Start the server:
 ```
 cd ../server
 npm start
 ```
 
-6. Start the client in a new terminal:
+7. Start the client in a new terminal:
 ```
 cd ../client
 npm start
 ```
 
-7. Open your browser and navigate to `http://localhost:3000`
+8. Open your browser and navigate to `http://localhost:3000`
+
+## Deployment
+
+The application is deployed on Vercel:
+
+- Frontend: https://sign-setu-frontend.vercel.app/
+- Backend API: https://sign-setu-backend.vercel.app/api
+
+### Deployment Steps
+
+1. Frontend deployment:
+   - Pushed code to GitHub repository
+   - Connected Vercel to the repository
+   - Set up environment variables in Vercel dashboard
+   - Deployed with Vercel's automated build process
+
+2. Backend deployment:
+   - Created a separate Vercel project for the backend API
+   - Set up MongoDB connection string in Vercel environment variables
+   - Configured serverless functions for the API endpoints
 
 ## API Endpoints
 
@@ -163,10 +195,6 @@ npm start
 - Reduces boilerplate code while maintaining clean architecture
 - Easier integration with React's hooks system
 
-## Deployment
-
-The application can be deployed on platforms like Vercel (frontend) and Heroku (backend) with minimal configuration.
-
 ## Accessibility Features
 
 SignSetu is designed with accessibility in mind:
@@ -188,4 +216,3 @@ SignSetu is designed with accessibility in mind:
 ---
 
 Created with ❤️ by Shreedhar
-# SignSetu
