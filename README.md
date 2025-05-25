@@ -6,7 +6,7 @@ SignSetu is a comprehensive sign language learning platform aimed at bridging co
 
 - **Frontend**: [https://sign-setu-frontend.vercel.app/](https://sign-setu-frontend.vercel.app/)
 - **Backend API**: [https://sign-setu-backend.vercel.app/api](https://sign-setu-backend.vercel.app/api)
-- **Demo Video**: [Watch the explanation video](https://youtu.be/your-video-id) 
+- **Demo Video**: [Watch the explanation video](https://www.loom.com/share/99586b1aa9f14eacb447395c032fc7e8?sid=f89b9b2e-bb01-4f6d-ac56-cb18264e2773) 
 
 ## Features
 
