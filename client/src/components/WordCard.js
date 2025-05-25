@@ -212,14 +212,21 @@ const WordCard = ({ word, onDelete }) => {
             className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70"
           />
           
+          {/* Repositioned play button to ensure full visibility in the corner */}
           <motion.button 
             onClick={toggleVideo}
-            className="video-toggle-btn absolute right-3 bottom-3 p-3 bg-primary text-white rounded-full shadow-lg hover:bg-secondary transition-colors z-10 pulse-ring"
+            className="video-toggle-btn absolute left-3 bottom-12 p-3 bg-primary text-white rounded-full shadow-lg hover:bg-secondary transition-colors z-20"
             aria-label={isVideoOpen ? "Close video" : "Play video"}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
+            initial={{ y: 5, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
           >
-            {isVideoPlaying ? <FaPause /> : <FaPlay />}
+            {isVideoPlaying ? 
+              <FaPause className="text-xl" /> : 
+              <FaPlay className="text-xl ml-0.5" />
+            }
           </motion.button>
           
           <motion.div
@@ -234,7 +241,7 @@ const WordCard = ({ word, onDelete }) => {
           </motion.div>
         </div>
         
-        <div className="p-4">
+        <div className="p-4 relative">
           <motion.p 
             className="text-gray-600 line-clamp-2"
           >

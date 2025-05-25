@@ -3,16 +3,6 @@ import { motion } from 'framer-motion';
 import { Hand, Users, Heart, Star, BookOpen, Globe, MapPin, Languages } from 'lucide-react';
 import { FaSignLanguage } from 'react-icons/fa';
 
-// Enhanced regions of India
-const indianRegions = [
-  { name: "उत्तर भारत", count: "8 States", color: "#FF6B35" },
-  { name: "दक्षिण भारत", count: "5 States", color: "#4CAF50" },
-  { name: "पूर्व भारत", count: "4 States", color: "#2196F3" },
-  { name: "पश्चिम भारत", count: "4 States", color: "#9C27B0" },
-  { name: "केंद्रीय भारत", count: "3 States", color: "#FF9800" },
-  { name: "पूर्वोत्तर भारत", count: "8 States", color: "#795548" }
-];
-
 // Multi-lingual headlines representing all of India
 const headlines = [
   "भारतीय सांकेतिक भाषा सीखें", // Hindi
