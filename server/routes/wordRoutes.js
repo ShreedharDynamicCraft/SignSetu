@@ -2,6 +2,12 @@ const express = require('express');
 const Word = require('../models/Word');
 const router = express.Router();
 
+// Sample log data
+let logs = [
+  { id: 1, message: 'Word created: example', timestamp: new Date() },
+  { id: 2, message: 'Word deleted: test', timestamp: new Date() }
+];
+
 // GET all words
 router.get('/words', async (req, res) => {
   try {
@@ -77,6 +83,25 @@ router.put('/words/:id', async (req, res) => {
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
+});
+
+// Add logs endpoint to the API router
+router.get('/logs', (req, res) => {
+  // Simple authentication check
+  const auth = req.headers.authorization;
+  
+  // In production, use proper authentication
+  if (!auth || auth !== 'Bearer admin-token') {
+    return res.status(401).json({ 
+      error: 'Unauthorized',
+      message: 'Admin authentication required'
+    });
+  }
+  
+  res.status(200).json({
+    total: logs.length,
+    logs: logs
+  });
 });
 
 module.exports = router;
