@@ -27,6 +27,40 @@ function isCacheValid() {
   );
 }
 
+// Ensure MongoDB is connected before processing requests
+const ensureConnection = async (req, res, next) => {
+  try {
+    const mongoose = global.mongooseConnection || require('mongoose');
+    
+    // Check connection state
+    if (mongoose.connection.readyState !== 1) {
+      console.log('[MONGODB] Connection not established, waiting...');
+      
+      // For Vercel, we need to await the connection
+      if (process.env.VERCEL === '1' && typeof global.connectToMongoDB === 'function') {
+        await global.connectToMongoDB();
+      } else {
+        // Wait up to 5 seconds for connection
+        for (let i = 0; i < 50 && mongoose.connection.readyState !== 1; i++) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        if (mongoose.connection.readyState !== 1) {
+          throw new Error('MongoDB connection timed out');
+        }
+      }
+    }
+    
+    next();
+  } catch (error) {
+    console.error('[MONGODB] Connection error in middleware:', error);
+    res.status(500).json({ message: 'Database connection error. Please try again.' });
+  }
+};
+
+// Apply the middleware to all routes
+router.use(ensureConnection);
+
 // Get all words with cache support
 router.get('/words', async (req, res) => {
   try {

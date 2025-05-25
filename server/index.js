@@ -36,36 +36,33 @@ const connectToMongoDB = async () => {
     // Optimized settings for serverless environment like Vercel
     const options = {
       // Less aggressive timeouts for Vercel's serverless functions
-      connectTimeoutMS: 30000, // Increased from 10000
-      socketTimeoutMS: 60000,   // Increased from 45000
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 60000,
       // These options handle Vercel serverless function reconnection efficiently
-      serverSelectionTimeoutMS: 30000, // Increased from 5000
+      serverSelectionTimeoutMS: 30000,
       // Auto-index creation should be disabled on Vercel
       autoIndex: false,
       // Important for Vercel to maintain connection
       maxPoolSize: 10,
-      minPoolSize: 5,
-      // Use the newer server API
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      // Cache connection for better performance in serverless
-      bufferCommands: false, // Disable command buffering
+      // Don't disable buffering in Vercel - this causes the error
+      bufferCommands: true, // Changed from false to true
     };
     
     // Special handling for Vercel
     if (process.env.VERCEL === '1') {
       console.log('[MONGODB] Connecting with Vercel optimized settings');
       
-      // For Vercel, establish a more resilient connection
-      // Use cached connection for better performance
-      if (mongoose.connection.readyState) {
-        console.log('[MONGODB] Using existing connection');
-        return;
+      // Check if already connected
+      if (mongoose.connection.readyState === 1) {
+        console.log('[MONGODB] Already connected');
+        return mongoose.connection;
       }
     }
 
-    await mongoose.connect(mongoURI, options);
+    // Await connection
+    const connection = await mongoose.connect(mongoURI, options);
     console.log('[MONGODB] Connected successfully');
+    return connection;
   } catch (err) {
     console.error('[MONGODB] Connection error:', err);
     
@@ -73,12 +70,18 @@ const connectToMongoDB = async () => {
     if (process.env.VERCEL !== '1') {
       console.log('[MONGODB] Retrying connection in 5 seconds...');
       setTimeout(connectToMongoDB, 5000);
+    } else {
+      // In Vercel, propagate the error
+      throw err;
     }
   }
 };
 
 // Connect to database
 connectToMongoDB();
+
+// Make the connection function available globally
+global.connectToMongoDB = connectToMongoDB;
 
 // API Routes Documentation Middleware
 app.get('/api', (req, res) => {
@@ -187,75 +190,25 @@ app.get('/logs', (req, res) => {
   });
 });
 
-// Also make /api/logs available for consistency
-app.get('/api/logs', (req, res) => {
-  console.log('[ACCESS] API Logs endpoint accessed');
-  
-  res.status(200).json({
-    total: logs.length,
-    logs: logs
-  });
-});
+// Make mongoose connection available globally
+global.mongooseConnection = mongoose;
 
-// Health check endpoint for Vercel
-app.get('/health', (req, res) => {
-  // Enhanced health check that includes MongoDB connection status
-  const mongoStatus = mongoose.connection.readyState;
-  const mongoStates = {
-    0: 'disconnected',
-    1: 'connected',
-    2: 'connecting',
-    3: 'disconnecting'
-  };
+// Export a serverless-compatible handler for Vercel
+const serverlessHandler = async (req, res) => {
+  // Make sure MongoDB is connected before handling requests
+  if (mongoose.connection.readyState !== 1) {
+    console.log('[VERCEL] Ensuring MongoDB connection before request');
+    await connectToMongoDB();
+  }
 
-  res.status(200).json({ 
-    status: 'ok', 
-    environment: process.env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime() + ' seconds',
-    mongodb: {
-      status: mongoStates[mongoStatus] || 'unknown',
-      connected: mongoStatus === 1,
-      host: mongoose.connection.host || 'not connected',
-      // Don't expose sensitive details in production
-      database: process.env.NODE_ENV === 'production' 
-        ? 'connected to database' 
-        : mongoose.connection.name
-    },
-    memoryUsage: process.memoryUsage(),
-    version: process.version
-  });
-});
-
-// Root route
-app.get('/', (req, res) => {
-  res.send(`
-    <html>
-      <head>
-        <title>SignSetu API</title>
-        <style>
-          body { font-family: system-ui, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
-          h1 { color: #3B82F6; }
-          .endpoint { background: #f1f5f9; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
-          code { background: #e2e8f0; padding: 2px 4px; border-radius: 3px; }
-        </style>
-      </head>
-      <body>
-        <h1>SignSetu API</h1>
-        <p>The API is running successfully. View comprehensive documentation at <a href="/api">/api</a>.</p>
-        <h2>Main Endpoints:</h2>
-        <div class="endpoint"><code>GET /api/words</code> - Get all words</div>
-        <div class="endpoint"><code>GET /api/words?search=query</code> - Search for words</div>
-        <div class="endpoint"><code>GET /api/health</code> - Check API health</div>
-      </body>
-    </html>
-  `);
-});
+  // Then process the request with the Express app
+  return app(req, res);
+};
 
 // For Vercel serverless deployment - this handles function timeouts better
 if (process.env.VERCEL === '1') {
-  // Export the express app for Vercel serverless deployment
-  module.exports = app;
+  // Export the serverless handler for Vercel
+  module.exports = serverlessHandler;
 } else {
   // Enhanced server startup with debug information
   app.listen(PORT, () => {
