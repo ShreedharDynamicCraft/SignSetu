@@ -23,7 +23,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// MongoDB connection with safe handling for Vercel
+// MongoDB connection with special handling for Vercel
 const connectToMongoDB = async () => {
   try {
     // For Vercel deployment, make sure to configure Environment Variables in the Vercel dashboard
@@ -33,23 +33,45 @@ const connectToMongoDB = async () => {
       throw new Error('MongoDB URI is not defined in environment variables');
     }
 
+    // Optimized settings for serverless environment like Vercel
     const options = {
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
+      // Less aggressive timeouts for Vercel's serverless functions
+      connectTimeoutMS: 30000, // Increased from 10000
+      socketTimeoutMS: 60000,   // Increased from 45000
       // These options handle Vercel serverless function reconnection efficiently
-      serverSelectionTimeoutMS: 5000,
-      // Auto-index creation should be disabled on Vercel due to serverless constraints
-      autoIndex: process.env.NODE_ENV !== 'production'
+      serverSelectionTimeoutMS: 30000, // Increased from 5000
+      // Auto-index creation should be disabled on Vercel
+      autoIndex: false,
+      // Important for Vercel to maintain connection
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      // Use the newer server API
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      // Cache connection for better performance in serverless
+      bufferCommands: false, // Disable command buffering
     };
     
+    // Special handling for Vercel
+    if (process.env.VERCEL === '1') {
+      console.log('[MONGODB] Connecting with Vercel optimized settings');
+      
+      // For Vercel, establish a more resilient connection
+      // Use cached connection for better performance
+      if (mongoose.connection.readyState) {
+        console.log('[MONGODB] Using existing connection');
+        return;
+      }
+    }
+
     await mongoose.connect(mongoURI, options);
-    console.log('MongoDB connected successfully');
+    console.log('[MONGODB] Connected successfully');
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('[MONGODB] Connection error:', err);
     
     // Don't retry on Vercel production as it's a serverless environment
     if (process.env.VERCEL !== '1') {
-      console.log('Retrying connection in 5 seconds...');
+      console.log('[MONGODB] Retrying connection in 5 seconds...');
       setTimeout(connectToMongoDB, 5000);
     }
   }
@@ -177,12 +199,31 @@ app.get('/api/logs', (req, res) => {
 
 // Health check endpoint for Vercel
 app.get('/health', (req, res) => {
+  // Enhanced health check that includes MongoDB connection status
+  const mongoStatus = mongoose.connection.readyState;
+  const mongoStates = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+
   res.status(200).json({ 
     status: 'ok', 
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
     uptime: process.uptime() + ' seconds',
-    memoryUsage: process.memoryUsage()
+    mongodb: {
+      status: mongoStates[mongoStatus] || 'unknown',
+      connected: mongoStatus === 1,
+      host: mongoose.connection.host || 'not connected',
+      // Don't expose sensitive details in production
+      database: process.env.NODE_ENV === 'production' 
+        ? 'connected to database' 
+        : mongoose.connection.name
+    },
+    memoryUsage: process.memoryUsage(),
+    version: process.version
   });
 });
 

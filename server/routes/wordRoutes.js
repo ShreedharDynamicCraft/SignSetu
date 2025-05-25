@@ -1,102 +1,160 @@
 const express = require('express');
-const Word = require('../models/Word');
 const router = express.Router();
+const Word = require('../models/Word');
 
-// Sample log data
-let logs = [
-  { id: 1, message: 'Word created: example', timestamp: new Date() },
-  { id: 2, message: 'Word deleted: test', timestamp: new Date() }
-];
+// Simple in-memory cache for faster responses in Vercel
+// This helps with the Vercel MongoDB timeout issue
+const cache = {
+  allWords: null,
+  wordById: {},
+  timestamp: null,
+  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+};
 
-// GET all words
+// Cache invalidation function
+function invalidateCache() {
+  cache.allWords = null;
+  cache.wordById = {};
+  cache.timestamp = null;
+  console.log('[CACHE] Cache invalidated');
+}
+
+// Check if cache is valid
+function isCacheValid() {
+  return (
+    cache.timestamp && 
+    (Date.now() - cache.timestamp) < cache.CACHE_DURATION
+  );
+}
+
+// Get all words with cache support
 router.get('/words', async (req, res) => {
   try {
-    const words = await Word.find().sort({ word: 1 });
-    res.json(words);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// GET word by search query
-router.get('/words/:query', async (req, res) => {
-  try {
-    const query = req.params.query;
-    const words = await Word.find({
-      word: { $regex: query, $options: 'i' }
-    }).sort({ word: 1 });
+    const { search } = req.query;
     
-    if (words.length === 0) {
-      return res.status(404).json({ message: 'No words found matching the query' });
+    // If it's a search query, bypass cache
+    if (search) {
+      console.log(`[WORDS] Searching for: ${search}`);
+      const regex = new RegExp(search, 'i');
+      const words = await Word.find({
+        $or: [
+          { word: regex },
+          { definition: regex }
+        ]
+      });
+      return res.json(words);
     }
     
+    // Check cache first for all words
+    if (isCacheValid() && cache.allWords) {
+      console.log('[CACHE] Serving words from cache');
+      return res.json(cache.allWords);
+    }
+    
+    console.log('[WORDS] Fetching all words from database');
+    // Add a longer timeout for Vercel
+    const words = await Word.find().maxTimeMS(25000);
+    
+    // Update cache
+    cache.allWords = words;
+    cache.timestamp = Date.now();
+    
     res.json(words);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    console.error('[ERROR] GET /words:', err.message);
+    res.status(500).json({ message: err.message });
   }
 });
 
-// POST a new word
-router.post('/words', async (req, res) => {
-  const word = new Word({
-    word: req.body.word,
-    definition: req.body.definition,
-    imageUrl: req.body.imageUrl,
-    videoUrl: req.body.videoUrl
-  });
-
+// Get word by ID with cache support
+router.get('/words/:id', async (req, res) => {
   try {
-    const newWord = await word.save();
-    res.status(201).json(newWord);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// BONUS: DELETE a word
-router.delete('/words/:id', async (req, res) => {
-  try {
-    const deletedWord = await Word.findByIdAndDelete(req.params.id);
-    if (!deletedWord) {
+    const { id } = req.params;
+    
+    // Check cache first
+    if (isCacheValid() && cache.wordById[id]) {
+      console.log(`[CACHE] Serving word ${id} from cache`);
+      return res.json(cache.wordById[id]);
+    }
+    
+    console.log(`[WORDS] Fetching word ${id} from database`);
+    const word = await Word.findById(id).maxTimeMS(15000);
+    
+    if (!word) {
       return res.status(404).json({ message: 'Word not found' });
     }
-    res.json({ message: 'Word deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    
+    // Update cache
+    cache.wordById[id] = word;
+    if (!cache.timestamp) cache.timestamp = Date.now();
+    
+    res.json(word);
+  } catch (err) {
+    console.error(`[ERROR] GET /words/${req.params.id}:`, err.message);
+    res.status(500).json({ message: err.message });
   }
 });
 
-// BONUS: UPDATE a word
+// Create a new word and invalidate cache
+router.post('/words', async (req, res) => {
+  try {
+    const word = new Word(req.body);
+    const newWord = await word.save();
+    
+    // Invalidate cache when data changes
+    invalidateCache();
+    
+    res.status(201).json(newWord);
+  } catch (err) {
+    console.error('[ERROR] POST /words:', err.message);
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Update a word and invalidate cache
 router.put('/words/:id', async (req, res) => {
   try {
-    const updatedWord = await Word.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
+    const { id } = req.params;
+    const updatedWord = await Word.findByIdAndUpdate(id, req.body, { new: true });
     
     if (!updatedWord) {
       return res.status(404).json({ message: 'Word not found' });
     }
     
+    // Invalidate cache when data changes
+    invalidateCache();
+    
     res.json(updatedWord);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+  } catch (err) {
+    console.error(`[ERROR] PUT /words/${req.params.id}:`, err.message);
+    res.status(400).json({ message: err.message });
   }
 });
 
-// Add logs endpoint to the API router
-router.get('/logs', (req, res) => {
-  // Simple authentication check
-  const auth = req.headers.authorization;
-  
-  // In production, use proper authentication
-  if (!auth || auth !== 'Bearer admin-token') {
-    return res.status(401).json({ 
-      error: 'Unauthorized',
-      message: 'Admin authentication required'
-    });
+// Delete a word and invalidate cache
+router.delete('/words/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedWord = await Word.findByIdAndDelete(id);
+    
+    if (!deletedWord) {
+      return res.status(404).json({ message: 'Word not found' });
+    }
+    
+    // Invalidate cache when data changes
+    invalidateCache();
+    
+    res.json({ message: 'Word deleted successfully' });
+  } catch (err) {
+    console.error(`[ERROR] DELETE /words/${req.params.id}:`, err.message);
+    res.status(500).json({ message: err.message });
   }
+});
+
+// Add logs endpoint to the API router to fix /api/logs issue
+router.get('/logs', (req, res) => {
+  // Access logs from parent scope or use your logging system
+  const logs = global.logs || [];
   
   res.status(200).json({
     total: logs.length,
